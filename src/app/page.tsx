@@ -32,12 +32,15 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ message }),
-      }).then(r=>r.json())
-      setResults(results)
+      })
+      // .then(r=>r.json())
+      // setResults(results)
 
       // TODO: Handle the response from the chat API to display the AI response in the UI
 
- 
+  const data = await response.json();
+  console.log("data:" , data)
+  setMessages (prev => [...prev, { role: "ai", content: data.message  }])
 
 
     } catch (error) {
