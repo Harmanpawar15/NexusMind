@@ -1,33 +1,43 @@
 
+
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import dayjs from "dayjs";
 
 type Message = {
   role: "user" | "ai";
   content: string;
+  timestamp: string;
 };
 
 export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", content: "Hello! How can I help you today?" },
+    {
+      role: "ai",
+      content: "Hello! How can I help you today?",
+      timestamp: dayjs().format("hh:mm A"),
+    },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [urlsInput, setUrlsInput] = useState("");
+  const [darkMode, setDarkMode] = useState(true);
 
   const handleSend = async () => {
     if (!message.trim() || !urlsInput.trim()) return;
 
-    const userMessage = { role: "user" as const, content: message };
-    setMessages(prev => [...prev, userMessage]);
+    const timestamp = dayjs().format("hh:mm A");
+    const userMessage: Message = { role: "user", content: message, timestamp };
+    setMessages((prev) => [...prev, userMessage]);
     setMessage("");
     setIsLoading(true);
 
     try {
       const urls = urlsInput
         .split(",")
-        .map(url => url.trim())
+        .map((url) => url.trim())
         .filter(Boolean);
 
       const response = await fetch("/api/chat", {
@@ -42,96 +52,137 @@ export default function Home() {
       });
 
       const data = await response.json();
-      console.log("API Response:", data);
 
-      if (data.error) {
-        setMessages(prev => [...prev, { role: "ai", content: `Error: ${data.error}` }]);
-      } else {
-        setMessages(prev => [...prev, { role: "ai", content: data.answer }]);
-      }
+      const aiMessage: Message = {
+        role: "ai",
+        content: data.answer || `Error: ${data.error}`,
+        timestamp: dayjs().format("hh:mm A"),
+      };
+      setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
-      console.error("Error:", error);
-      setMessages(prev => [...prev, { role: "ai", content: "Something went wrong." }]);
+      const errorMessage: Message = {
+        role: "ai",
+        content: "Something went wrong.",
+        timestamp: dayjs().format("hh:mm A"),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="flex flex-col h-screen bg-gray-900">
-      {/* Header */}
-      <div className="w-full bg-gray-800 border-b border-gray-700 p-4">
-        <div className="max-w-3xl mx-auto">
-          <h1 className="text-xl font-semibold text-white">Chat with Web Scraper</h1>
-        </div>
-      </div>
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto pb-32 pt-4">
-        <div className="max-w-3xl mx-auto px-4">
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`flex gap-4 mb-4 ${
-                msg.role === "ai"
-                  ? "justify-start"
-                  : "justify-end flex-row-reverse"
-              }`}
-            >
-              <div
-                className={`px-4 py-2 rounded-2xl max-w-[80%] ${
-                  msg.role === "ai"
-                    ? "bg-gray-800 border border-gray-700 text-gray-100"
-                    : "bg-cyan-600 text-white ml-auto"
+  return (
+    <div
+      className={`flex flex-col h-screen ${
+        darkMode ? "bg-black text-white" : "bg-white text-black"
+      } transition-all`}
+    >
+      {/* Header */}
+      <header className="w-full p-5 border-b dark:border-gray-800 border-gray-300 shadow-md sticky top-0 bg-white dark:bg-gray-900 z-10 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-cyan-500">
+            Web Scraper AI Chat
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Ask anything based on provided URLs.
+          </p>
+        </div>
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="text-sm bg-cyan-600 text-white px-3 py-1.5 rounded-xl shadow hover:bg-cyan-700 transition"
+        >
+          Toggle {darkMode ? "Light" : "Dark"} Mode
+        </button>
+      </header>
+
+      {/* Chat Area */}
+      <main className="flex-1 overflow-y-auto px-4 py-6 md:px-6">
+        <div className="max-w-4xl mx-auto space-y-5">
+          <AnimatePresence>
+            {messages.map((msg, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className={`flex ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                {msg.content}
-              </div>
-            </div>
-          ))}
+                <div className="flex gap-2 max-w-[80%] md:max-w-[70%] items-end">
+                  <div className="text-2xl">
+                    {msg.role === "user" ? "🙂" : "🧠"}
+                  </div>
+                  <div
+                    className={`px-5 py-3 rounded-2xl shadow ${
+                      msg.role === "user"
+                        ? "bg-cyan-600 text-white rounded-br-none"
+                        : "bg-gray-100 dark:bg-gray-800 dark:text-white text-gray-900 rounded-bl-none"
+                    }`}
+                  >
+                    <p>{msg.content}</p>
+                    <div className="text-xs mt-2 text-gray-400">
+                      {msg.timestamp}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
           {isLoading && (
-            <div className="flex gap-4 mb-4">
-              <div className="px-4 py-2 rounded-2xl bg-gray-800 border border-gray-700 text-gray-100">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex justify-start"
+            >
+              <div className="flex gap-2 max-w-[70%] items-center">
+                <div className="text-2xl">🧠</div>
+                <div className="px-5 py-3 rounded-2xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 animate-pulse">
+                  <span className="inline-flex gap-1">
+                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span>
+                  </span>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
-      </div>
+      </main>
 
-      {/* Input Area */}
-      <div className="fixed bottom-0 w-full bg-gray-800 border-t border-gray-700 p-4">
-        <div className="max-w-3xl mx-auto space-y-2">
+      {/* Footer Inputs */}
+      <footer className="w-full border-t border-gray-300 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+        <div className="max-w-4xl mx-auto space-y-3">
           <input
-            type="text"
             value={urlsInput}
-            onChange={e => setUrlsInput(e.target.value)}
-            placeholder="Enter URLs (comma separated)"
-            className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+            onChange={(e) => setUrlsInput(e.target.value)}
+            placeholder="Enter URLs (comma separated)..."
+            className="w-full bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500 px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-2">
             <input
-              type="text"
               value={message}
-              onChange={e => setMessage(e.target.value)}
-              onKeyPress={e => e.key === "Enter" && handleSend()}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type your question..."
-              className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+              className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500 px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
             <button
               onClick={handleSend}
               disabled={isLoading}
-              className="bg-cyan-600 text-white px-5 py-3 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-5 py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Sending..." : "Send"}
             </button>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
