@@ -1,70 +1,71 @@
-// TODO: Implement the chat API with Groq and web scraping with Cheerio and Puppeteer:done
-// Refer to the Next.js Docs on how to read the Request body: https://nextjs.org/docs/app/building-your-application/routing/route-handlers
-// Refer to the Groq SDK here on how to use an LLM: https://www.npmjs.com/package/groq-sdk
-// Refer to the Cheerio docs here on how to parse HTML: https://cheerio.js.org/docs/basics/loading
-// Refer to Puppeteer docs here: https://pptr.dev/guides/what-is-puppeteer
-
-
-import chromium  from "@sparticuz/chromium-min";
 import { NextResponse } from "next/server";
-import puppeteer from "puppeteer-core";
 import { getGroqResponse } from "@/app/utils/groqClient";
-import { urlPattern } from "@/app/utils/scraper";
+import { scrapeUrl } from "@/app/utils/scraper";
 
+// Define expected types
+type ScrapeSuccess = {
+  url: string;
+  title: string;
+  summary: string;
+};
 
+type ScrapeFailure = {
+  url: string;
+  error: string;
+};
 
-chromium.setHeadlessMode = true;
-chromium.setGraphicsMode = false;
+type ScrapeResult = ScrapeSuccess | ScrapeFailure;
 
-
-
+// Type guard to check if a result is a successful scrape
+function isScrapeSuccess(result: ScrapeResult): result is ScrapeSuccess {
+  return !("error" in result);
+}
 
 export async function POST(req: Request) {
-//   await chromium.font(
-//     "https://raw.githack.com/googlei18n/noto-emoji/master/fonts/NotoColorEmoji.ttf"
-//   );
-  
-//  const isLocal=!!process.env.CHROME_EXECUTABLE_PATH ;
-
-
-//     const browser = await puppeteer.launch({
-//       args: isLocal ? puppeteer.defaultArgs():[...chromium.args, '-hide-scrollbars', '-incognito','—-no-sandbox'],
-//       defaultViewport: chromium.defaultViewport,
-//       executablePath: process.env.CHROME_EXECUTABLE_PATH || await chromium.executablePath(),
-//       headless: chromium.headless,
-//       ignoreHTTPSErrors:true
-//     });
-  
-//     const page = await browser.newPage();
-//     await page.goto("https://missuniverseindia.glamanand.com");
-//     const pageTitle = await page.title();
-    
-
-    
-//     await browser.close();
-  
-
-
   try {
-    // return Response.json({
-    //   //test:true
-    //   pageTitle 
-    // })
+    const { urls, question } = await req.json();
 
-    const {message}=await req.json()
-
-    const url=message.match(urlPattern);
-    if(url){
-      console.log("url found:" , url)
+    if (!urls || !Array.isArray(urls) || urls.length === 0 || !question) {
+      return NextResponse.json({ error: "Missing URLs or question." }, { status: 400 });
     }
 
-    const response = await getGroqResponse(message);
-    return NextResponse.json({message:response})
+    // Scrape all URLs in parallel
+    const results: ScrapeResult[] = await Promise.all(
+      urls.map((url: string) => scrapeUrl(url))
+    );
 
-  }
-   catch (error) {
+    // Filter only successful scrapes
+    const successfulScrapes = results.filter(isScrapeSuccess);
 
-    return NextResponse.json({message:Error})
+    if (successfulScrapes.length === 0) {
+      return NextResponse.json({ error: "Failed to scrape all URLs." }, { status: 500 });
+    }
 
+    // Build context from scraped data
+    const context = successfulScrapes
+      .map(
+        (page, i) =>
+          `Source [${i + 1}]: ${page.url}\nTitle: ${page.title}\nContent: ${page.summary}`
+      )
+      .join("\n\n");
+
+    const fullPrompt = `${context}\n\nQuestion: ${question}`;
+
+    // Ask Groq for the response
+    const answer = await getGroqResponse(fullPrompt);
+
+    // Return the response along with sources
+    return NextResponse.json({
+      answer,
+      sources: successfulScrapes.map((page, i) => ({
+        index: i + 1,
+        url: page.url,
+        title: page.title,
+        snippet: page.summary.slice(0, 200), // Optional for frontend preview
+      })),
+    });
+  } catch (err) {
+    console.error("Error in chat route:", err);
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
