@@ -10,11 +10,13 @@ This project is a **Next.js** app that crawls and scrapes web pages from provide
 
 Key features:
 
-- Scrapes multiple pages recursively with Puppeteer fallback
-- Extracts page titles, headings, and main content intelligently
-- Uses AI to generate summarized, simplified answers from scraped data
-- Supports question answering based on live web content
-- Deployable on Vercel with environment variable configuration
+- 🔍 Scrapes multiple pages recursively with Puppeteer fallback  
+- 🧠 Extracts page titles, headings, and main content intelligently  
+- 💬 Uses AI to generate summarized, simplified answers from scraped data  
+- ❓ Supports question answering based on live web content  
+- 🔗 Share your conversation via link and let others continue the same thread
+- 🌐 Deployable on Vercel with environment variable configuration  
+
 
 ---
 
