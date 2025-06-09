@@ -71,9 +71,44 @@ export default function Home() {
     }
   };
 
+  
+  const handleShare = async () => {
+    try {
+      const res = await fetch("/api/save_chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(messages),
+      });
+  
+      const data = await res.json();
+      if (data.id) {
+        const shareUrl = `${window.location.origin}/?chat=${data.id}`;
+        await navigator.clipboard.writeText(shareUrl);
+        alert("Share link copied to clipboard!");
+      }
+    } catch (err) {
+      alert("Failed to share conversation.");
+    }
+  };
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
+    // Load shared chat
+  const params = new URLSearchParams(window.location.search);
+  const chatId = params.get("chat");
+  if (chatId) {
+    fetch(`/api/save_chat?id=${chatId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.messages) {
+          setMessages(data.messages);
+        }
+      })
+      .catch(() => alert("Failed to load shared chat."));
+  }
   }, [darkMode]);
+
+  
 
   return (
     <div
@@ -83,21 +118,28 @@ export default function Home() {
     >
       {/* Header */}
       <header className="w-full p-5 border-b dark:border-gray-800 border-gray-300 shadow-md sticky top-0 bg-white dark:bg-gray-900 z-10 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-cyan-500">
-            Web Scraper AI Chat
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Ask anything based on provided URLs.
-          </p>
-        </div>
-        <button
-          onClick={() => setDarkMode(!darkMode)}
-          className="text-sm bg-cyan-600 text-white px-3 py-1.5 rounded-xl shadow hover:bg-cyan-700 transition"
-        >
-          Toggle {darkMode ? "Light" : "Dark"} Mode
-        </button>
-      </header>
+  <div>
+    <h1 className="text-2xl font-bold text-cyan-500">Web Scraper AI Chat</h1>
+    <p className="text-sm text-gray-500 dark:text-gray-400">
+      Ask anything based on provided URLs.
+    </p>
+  </div>
+  <div className="flex gap-2">
+    <button
+      onClick={handleShare}
+      className="text-sm bg-green-600 text-white px-3 py-1.5 rounded-xl shadow hover:bg-green-700 transition"
+    >
+      Share
+    </button>
+    <button
+      onClick={() => setDarkMode(!darkMode)}
+      className="text-sm bg-cyan-600 text-white px-3 py-1.5 rounded-xl shadow hover:bg-cyan-700 transition"
+    >
+      Toggle {darkMode ? "Light" : "Dark"} Mode
+    </button>
+  </div>
+</header>
+
 
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto px-4 py-6 md:px-6">
