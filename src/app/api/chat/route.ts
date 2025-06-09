@@ -1,8 +1,8 @@
+
 import { NextResponse } from "next/server";
 import { getGroqResponse } from "@/app/utils/groqClient";
-import { scrapeUrl } from "@/app/utils/scraper";
+import { crawlWebsite } from "@/app/utils/scraper";
 
-// Define expected types
 type ScrapeSuccess = {
   url: string;
   title: string;
@@ -16,7 +16,6 @@ type ScrapeFailure = {
 
 type ScrapeResult = ScrapeSuccess | ScrapeFailure;
 
-// Type guard to check if a result is a successful scrape
 function isScrapeSuccess(result: ScrapeResult): result is ScrapeSuccess {
   return !("error" in result);
 }
@@ -29,19 +28,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing URLs or question." }, { status: 400 });
     }
 
-    // Scrape all URLs in parallel
-    const results: ScrapeResult[] = await Promise.all(
-      urls.map((url: string) => scrapeUrl(url))
+    // Crawl each URL (depth = 2, max 5 pages per domain)
+    const crawlResults = await Promise.all(
+      urls.map((url: string) => crawlWebsite(url, 2, 5))
     );
 
-    // Filter only successful scrapes
+    const results: ScrapeResult[] = crawlResults.flat().map((page) => ({
+      url: page.url,
+      title: page.title,
+      summary: page.summary,
+    }));
+
     const successfulScrapes = results.filter(isScrapeSuccess);
 
     if (successfulScrapes.length === 0) {
-      return NextResponse.json({ error: "Failed to scrape all URLs." }, { status: 500 });
+      return NextResponse.json({ error: "Failed to scrape any content." }, { status: 500 });
     }
 
-    // Build context from scraped data
     const context = successfulScrapes
       .map(
         (page, i) =>
@@ -49,19 +52,20 @@ export async function POST(req: Request) {
       )
       .join("\n\n");
 
-    const fullPrompt = `${context}\n\nQuestion: ${question}`;
-
-    // Ask Groq for the response
+    const fullPrompt = `You are a helpful assistant. Based on the content below, answer the user's question in a clean, paragraph-style summary that is clear and easy to read. Do not just list bullet points. Write in natural, human-like English.
+    
+    ${context}\n\nQuestion: ${question}
+    Answer (clear and concise):
+    `;
     const answer = await getGroqResponse(fullPrompt);
 
-    // Return the response along with sources
     return NextResponse.json({
       answer,
       sources: successfulScrapes.map((page, i) => ({
         index: i + 1,
         url: page.url,
         title: page.title,
-        snippet: page.summary.slice(0, 200), // Optional for frontend preview
+        snippet: page.summary.slice(0, 200),
       })),
     });
   } catch (err) {

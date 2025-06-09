@@ -119,7 +119,7 @@ export default function Home() {
       {/* Header */}
       <header className="w-full p-5 border-b dark:border-gray-800 border-gray-300 shadow-md sticky top-0 bg-white dark:bg-gray-900 z-10 flex justify-between items-center">
   <div>
-    <h1 className="text-2xl font-bold text-cyan-500">Web Scraper AI Chat</h1>
+    <h1 className="text-2xl font-bold text-cyan-500">NEXUS MIND: Web Scraper AI Chat</h1>
     <p className="text-sm text-gray-500 dark:text-gray-400">
       Ask anything based on provided URLs.
     </p>
